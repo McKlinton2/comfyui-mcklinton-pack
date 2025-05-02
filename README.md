@@ -4,6 +4,8 @@ This custom node for ComfyUI enables detailed segmentation of colored mask image
 
  It is mainly intended to be used with Virt-A-Mate plugin SnapshotAnimator, which is able exporting depth, segmentation maps from VAM scenes. Plugin is available for my Patreons in https://www.patreon.com/McKlintonProductions. See also the plugin description in https://hub.virtamate.com/resources/snapshot-animator.45689/
 
+<img src="./images/masknode.png" alt="Mask Node" width="600">
+
 ## Features
 
 - Reads pre-generated colored segmentation maps and extracts:
