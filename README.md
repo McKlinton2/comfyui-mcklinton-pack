@@ -1,8 +1,8 @@
 # ComfyUI McKlinton Pack — Mask Node
 
-This custom node for ComfyUI enables detailed segmentation of colored mask images into specific anatomical regions for male and female bodies. 
+This custom node for ComfyUI enables detailed segmentation of colored mask images into specific anatomical regions for male and female bodies.
 
- It is mainly intended to be used with Virt-A-Mate plugin SnapshotAnimator, which is able exporting depth, segmentation maps from VAM scenes. Plugin is available for my Patreons in https://www.patreon.com/McKlintonProductions. See also the plugin description in https://hub.virtamate.com/resources/snapshot-animator.45689/
+It is mainly intended to be used with Virt-A-Mate plugin SnapshotAnimator, which is able to export depth and segmentation maps from VAM scenes. The plugin is available for my Patreons at https://www.patreon.com/McKlintonProductions. See also the plugin description at https://hub.virtamate.com/resources/snapshot-animator.45689/.
 
 <img src="./images/masknode.png" alt="Mask Node" width="600">
 
@@ -20,6 +20,10 @@ This custom node for ComfyUI enables detailed segmentation of colored mask image
   - Raw segmentation image
   - Prompt text associated with the image set
 - Optional random sample selection from folder
+- Supports resizing and cropping of images with the following modes:
+  - Keep original size
+  - Resize to specified dimensions
+  - Resize and crop to specified dimensions
 
 ## Folder Structure
 
@@ -30,12 +34,13 @@ This node expects a folder containing related image files, named in the followin
     depth_<image_name>.png
     prompt_<image_name>.txt
 
-Each set of files must use the same <image_name> to be grouped together.
+Each set of files must use the same `<image_name>` to be grouped together.
 
 ## How It Works
 
 - It reads and processes one image set based on an index (or randomly).
 - The mask image is processed by detecting exact RGB colors defined for each body part.
+- Supports resizing and cropping of images to fit the pipeline requirements.
 - Resulting masks are returned as tensors in the ComfyUI pipeline.
 
 ## Input Parameters
@@ -43,8 +48,11 @@ Each set of files must use the same <image_name> to be grouped together.
 | Name           | Type     | Description                                             |
 |----------------|----------|---------------------------------------------------------|
 | folder         | string   | Path to folder containing the image sets                |
-| index          | int      | Which image set to load (if random_index is false)      |
+| index          | int      | Which image set to load (if `random_index` is false)    |
 | random_index   | boolean  | If true, randomly selects one set from the folder       |
+| resize_mode    | string   | Resizing mode: `keep original`, `resize`, or `resize and crop` |
+| width          | int      | Target width for resizing (if applicable)              |
+| height         | int      | Target height for resizing (if applicable)             |
 
 ## Outputs
 
@@ -68,7 +76,7 @@ Each set of files must use the same <image_name> to be grouped together.
 | color            | RGB color image (normalized tensor)  |
 | depth            | Depth image (normalized tensor)      |
 | segmentation     | Raw segmentation image               |
-| prompt           | Prompt text (from .txt file)         |
+| prompt           | Prompt text (from `.txt` file)       |
 
 ## 🎨 Mask Identification Colors
 
@@ -87,13 +95,11 @@ Each set of files must use the same <image_name> to be grouped together.
 | male_pen         | (128, 255, 0)     | #80FF00    |
 | male_pubic       | (128, 255, 255)   | #80FFFF    |
 
-
 ## Installation
 
-Clone this repository in directory:
+Clone this repository in the directory:
 
     ComfyUI/custom_nodes/comfyui-mcklinton-pack
-
 
 Then restart ComfyUI. The node will appear under:
 
@@ -103,6 +109,7 @@ Then restart ComfyUI. The node will appear under:
 
 - Only exact RGB matches are used for mask generation.
 - If a mask image is missing or can't be read, a zero-mask is returned instead.
+- Resizing and cropping options ensure compatibility with different pipeline requirements.
 
 ## License
 

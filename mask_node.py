@@ -13,6 +13,9 @@ class ColormaskNode:
             "folder": ("STRING", {"widget": "folder"}),
             "index": ("INT", {"default": 0, "min": 0, "max": 100, "step": 1}),
             "random_index": ("BOOLEAN", {"default": False}),
+            "resize_mode": (["keep original", "resize", "resize and crop"], {"default": "keep original"}),
+            "width": ("INT", {"default": 512, "min": 64, "max": 4096, "step": 8}),
+            "height": ("INT", {"default": 512, "min": 64, "max": 4096, "step": 8}),
         }}
 
     RETURN_TYPES = (
@@ -43,7 +46,40 @@ class ColormaskNode:
     MALE_PUBIC_RGB = (128, 255, 255)
     MALE_HAIR_RGB = (128, 128, 0)
 
-    def process_folder(self, folder, index, random_index):
+    def resize_image(self, image, resize_mode, width, height):
+        if image is None or resize_mode == "keep original":
+            return image
+            
+        h, w = image.shape[:2]
+        
+        if resize_mode == "resize":
+            # Simple resize without preserving aspect ratio
+            return cv2.resize(image, (width, height), interpolation=cv2.INTER_AREA)
+        
+        elif resize_mode == "resize and crop":
+            # Resize preserving aspect ratio and then crop center
+            scale = max(width / w, height / h)
+            new_w, new_h = int(w * scale), int(h * scale)
+            resized = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA)
+            
+            # Crop center
+            start_x = max(0, new_w // 2 - width // 2)
+            start_y = max(0, new_h // 2 - height // 2)
+            cropped = resized[start_y:start_y + height, start_x:start_x + width]
+            
+            # Handle the case where the cropped image is smaller than the target size
+            if cropped.shape[0] < height or cropped.shape[1] < width:
+                result = np.zeros((height, width, 3), dtype=cropped.dtype) if len(image.shape) == 3 else np.zeros((height, width), dtype=cropped.dtype)
+                y_offset = (height - cropped.shape[0]) // 2
+                x_offset = (width - cropped.shape[1]) // 2
+                result[y_offset:y_offset+cropped.shape[0], x_offset:x_offset+cropped.shape[1]] = cropped
+                return result
+            
+            return cropped
+            
+        return image
+
+    def process_folder(self, folder, index, random_index, resize_mode="keep original", width=512, height=512):
         if not os.path.exists(folder):
             raise ValueError("Folder does not exist: " + folder)
 
@@ -92,6 +128,9 @@ class ColormaskNode:
             if colored_mask_image is None:
                 raise ValueError("Failed to read mask image: " + mask_path)
             
+            # Apply resizing if needed
+            colored_mask_image = self.resize_image(colored_mask_image, resize_mode, width, height)
+            
             female_body_mask = self.extract_mask_by_color(colored_mask_image, self.FEMALE_BODY_RGB)
             female_face_mask = self.extract_mask_by_color(colored_mask_image, self.FEMALE_FACE_RGB)
             female_hair_mask = self.extract_mask_by_color(colored_mask_image, self.FEMALE_HAIR_RGB)
@@ -116,7 +155,7 @@ class ColormaskNode:
             )
             all_gens_mask = torch.max(torch.max(female_vag_mask, male_pen_mask), male_pubic_mask)
         else:
-            empty_mask = torch.zeros((1, 512, 512), dtype=torch.float32)
+            empty_mask = torch.zeros((1, height, width), dtype=torch.float32)
             female_body_mask = female_face_mask = female_breast_mask = female_hands_mask = female_vag_mask = empty_mask
             male_body_mask = male_face_mask = male_hands_mask = male_pen_mask = male_pubic_mask = empty_mask
             female_full_mask = male_full_mask = all_gens_mask = empty_mask
@@ -126,40 +165,45 @@ class ColormaskNode:
             color_path = os.path.join(folder, selected_files['color'])
             color_image = cv2.imread(color_path)
             if color_image is None:
-                color_image_tensor = torch.zeros((512, 512, 3), dtype=torch.float32).unsqueeze(0)
+                color_image_tensor = torch.zeros((height, width, 3), dtype=torch.float32).unsqueeze(0)
             else:
+                # Apply resizing if needed
+                color_image = self.resize_image(color_image, resize_mode, width, height)
                 color_image = cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB)
                 color_image_tensor = torch.from_numpy(color_image).float() / 255.0
                 color_image_tensor = color_image_tensor.unsqueeze(0)
         else:
-            color_image_tensor = torch.zeros((512, 512, 3), dtype=torch.float32).unsqueeze(0)
+            color_image_tensor = torch.zeros((height, width, 3), dtype=torch.float32).unsqueeze(0)
 
         # Process depth image
         if 'depth' in selected_files:
             depth_path = os.path.join(folder, selected_files['depth'])
             depth_image = cv2.imread(depth_path)
             if depth_image is None:
-                depth_image_tensor = torch.zeros((512, 512, 3), dtype=torch.float32).unsqueeze(0)
+                depth_image_tensor = torch.zeros((height, width, 3), dtype=torch.float32).unsqueeze(0)
             else:
+                # Apply resizing if needed
+                depth_image = self.resize_image(depth_image, resize_mode, width, height)
                 depth_image = cv2.cvtColor(depth_image, cv2.COLOR_BGR2RGB)
                 depth_image_tensor = torch.from_numpy(depth_image).float() / 255.0
                 depth_image_tensor = depth_image_tensor.unsqueeze(0)
         else:
-            depth_image_tensor = torch.zeros((512, 512, 3), dtype=torch.float32).unsqueeze(0)
+            depth_image_tensor = torch.zeros((height, width, 3), dtype=torch.float32).unsqueeze(0)
 
-        
         # Process segmentation image
         if 'masks' in selected_files:
             masks_path = os.path.join(folder, selected_files['masks'])
             masks_image = cv2.imread(masks_path)
             if masks_image is None:
-                masks_image_tensor = torch.zeros((512, 512, 3), dtype=torch.float32).unsqueeze(0)
+                masks_image_tensor = torch.zeros((height, width, 3), dtype=torch.float32).unsqueeze(0)
             else:
+                # Apply resizing if needed (same as above since this uses the same file)
+                masks_image = self.resize_image(masks_image, resize_mode, width, height)
                 masks_image = cv2.cvtColor(masks_image, cv2.COLOR_BGR2RGB)
                 masks_image_tensor = torch.from_numpy(masks_image).float() / 255.0
                 masks_image_tensor = masks_image_tensor.unsqueeze(0)
         else:
-            masks_image_tensor = torch.zeros((512, 512, 3), dtype=torch.float32).unsqueeze(0)        
+            masks_image_tensor = torch.zeros((height, width, 3), dtype=torch.float32).unsqueeze(0)        
             
         return (
             female_body_mask,
