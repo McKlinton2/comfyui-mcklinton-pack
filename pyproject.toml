@@ -1,0 +1,15 @@
+[project]
+name = "mcklinton-pack"
+description = "This custom node for ComfyUI enables detailed segmentation of colored mask images into specific anatomical regions for male and female bodies."
+version = "1.0.0"
+license = {file = "LICENSE"}
+dependencies = ["numpy", "opencv_contrib_python", "opencv_python", "opencv_python_headless", "Pillow", "torch"]
+
+[project.urls]
+Repository = "https://github.com/McKlinton2/comfyui-mcklinton-pack"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = ""
+DisplayName = "comfyui-mcklinton-pack"
+Icon = ""
